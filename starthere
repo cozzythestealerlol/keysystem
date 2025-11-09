@@ -1,0 +1,276 @@
+--// Advanced Roblox Key GUI System
+--// Author: You
+--// Features:
+--// - Gradient & blur background
+--// - Centered GUI on load
+--// - Wrong key animation + reset
+--// - Welcome animation (moves + shrinks)
+--// - Multi-game script support + default fallback
+--// - "X" close button with tooltip
+--// - Welcome fade + smooth transition to real script
+--// - Clipboard link button (side-by-side with Submit)
+
+------------------------------------------------------------
+-- CONFIGURATION
+------------------------------------------------------------
+
+local correctKey = "MySecretKey123"
+
+local gameScripts = {
+	[108631717812345] = "https://raw.githubusercontent.com/cozzythestealerlol/mainscript/refs/heads/main/hujsfjkhsfsailh",
+	[118915549367482] = "https://raw.githubusercontent.com/cozzythestealerlol/dwtbguiandstuff/refs/heads/main/dwtbadminsass"
+}
+
+local defaultScript = "https://example.com/default-script.lua"
+
+local clipboardLink = "dont worry about this at the moment" -- yeah
+
+------------------------------------------------------------
+-- SERVICES
+------------------------------------------------------------
+local TweenService = game:GetService("TweenService")
+local player = game.Players.LocalPlayer
+
+------------------------------------------------------------
+-- GUI CREATION
+------------------------------------------------------------
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "KeySystemGui"
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Blur
+local blur = Instance.new("BlurEffect")
+blur.Size = 0
+blur.Parent = game.Lighting
+
+-- Background Gradient
+local bgFrame = Instance.new("Frame")
+bgFrame.Parent = gui
+bgFrame.Size = UDim2.new(1, 0, 1, 0)
+bgFrame.BackgroundTransparency = 1
+local bgGradient = Instance.new("UIGradient", bgFrame)
+bgGradient.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 160, 130)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 150, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 200))
+}
+bgGradient.Rotation = 45
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Parent = gui
+frame.Size = UDim2.new(0, 420, 0, 220)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+frame.BackgroundTransparency = 0.55
+frame.BorderSizePixel = 0
+frame.Visible = false
+frame.Active = true
+frame.Draggable = true
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 20)
+
+-- Gradient overlay
+local gradient = Instance.new("UIGradient", frame)
+gradient.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 180, 130)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 140, 255))
+}
+gradient.Rotation = 45
+
+-- Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Parent = frame
+closeBtn.Text = "X"
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -40, 0, 10)
+closeBtn.BackgroundTransparency = 0.8
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 20
+
+local closeCorner = Instance.new("UICorner", closeBtn)
+closeCorner.CornerRadius = UDim.new(1, 0)
+
+local tooltip = Instance.new("TextLabel")
+tooltip.Parent = closeBtn
+tooltip.Text = "Close"
+tooltip.BackgroundTransparency = 1
+tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
+tooltip.TextSize = 12
+tooltip.Position = UDim2.new(-0.3, 0, 1, 0)
+tooltip.Visible = false
+
+closeBtn.MouseEnter:Connect(function()
+	closeBtn.BackgroundTransparency = 0.5
+	tooltip.Visible = true
+end)
+closeBtn.MouseLeave:Connect(function()
+	closeBtn.BackgroundTransparency = 0.8
+	tooltip.Visible = false
+end)
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
+	blur:Destroy()
+end)
+
+-- "Key:" Label
+local keyLabel = Instance.new("TextLabel")
+keyLabel.Parent = frame
+keyLabel.Text = "Key:"
+keyLabel.Position = UDim2.new(0.1, 0, 0.35, 0)
+keyLabel.Size = UDim2.new(0, 50, 0, 30)
+keyLabel.BackgroundTransparency = 1
+keyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+keyLabel.Font = Enum.Font.Gotham
+keyLabel.TextSize = 18
+
+-- TextBox
+local keyBox = Instance.new("TextBox")
+keyBox.Parent = frame
+keyBox.PlaceholderText = "Enter your key"
+keyBox.Position = UDim2.new(0.25, 0, 0.35, 0)
+keyBox.Size = UDim2.new(0.5, 0, 0, 30)
+keyBox.BackgroundTransparency = 0.3
+keyBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+keyBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+keyBox.PlaceholderColor3 = Color3.fromRGB(0, 0, 0)
+keyBox.Font = Enum.Font.Gotham
+keyBox.TextSize = 16
+
+local keyCorner = Instance.new("UICorner", keyBox)
+keyCorner.CornerRadius = UDim.new(0, 10)
+
+------------------------------------------------------------
+-- SIDE-BY-SIDE BUTTONS
+------------------------------------------------------------
+
+-- Submit button (left)
+local submitBtn = Instance.new("TextButton")
+submitBtn.Parent = frame
+submitBtn.Text = "Submit"
+submitBtn.Size = UDim2.new(0, 140, 0, 35)
+submitBtn.Position = UDim2.new(0.15, 0, 0.55, 0)
+submitBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+submitBtn.BackgroundTransparency = 0.3
+submitBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+submitBtn.Font = Enum.Font.GothamBold
+submitBtn.TextSize = 18
+local submitCorner = Instance.new("UICorner", submitBtn)
+submitCorner.CornerRadius = UDim.new(0, 10)
+
+-- Clipboard button (right)
+local copyBtn = Instance.new("TextButton")
+copyBtn.Parent = frame
+copyBtn.Text = "Key System Here"
+copyBtn.Size = UDim2.new(0, 140, 0, 35)
+copyBtn.Position = UDim2.new(0.55, 0, 0.55, 0)
+copyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+copyBtn.BackgroundTransparency = 0.3
+copyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+copyBtn.Font = Enum.Font.GothamBold
+copyBtn.TextSize = 16
+local copyCorner = Instance.new("UICorner", copyBtn)
+copyCorner.CornerRadius = UDim.new(0, 10)
+
+copyBtn.MouseButton1Click:Connect(function()
+	if setclipboard then
+		setclipboard(clipboardLink)
+		copyBtn.Text = "Copied!"
+		task.wait(2)
+		copyBtn.Text = "Key System Here"
+	end
+end)
+
+------------------------------------------------------------
+-- FADE-IN EFFECT
+------------------------------------------------------------
+
+frame.Visible = true
+frame.BackgroundTransparency = 1
+bgGradient.Transparency = NumberSequence.new(1)
+blur.Size = 0
+
+task.spawn(function()
+	for i = 1, 20 do
+		frame.BackgroundTransparency = 1 - (i * 0.02)
+		blur.Size = i * 0.6
+		bgGradient.Transparency = NumberSequence.new(1 - (i * 0.05))
+		task.wait(0.02)
+	end
+end)
+
+------------------------------------------------------------
+-- KEY VALIDATION WITH ANIMATION + FADE-OUT
+------------------------------------------------------------
+
+local function resetKeyBox()
+	keyBox.PlaceholderText = "Enter your key"
+	keyBox.Text = ""
+	submitBtn.Active = true
+	keyBox.Active = true
+end
+
+submitBtn.MouseButton1Click:Connect(function()
+	local entered = keyBox.Text
+
+	if entered == correctKey then
+		-- Animate to center and shrink
+		local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		TweenService:Create(frame, tweenInfo, {
+			Size = UDim2.new(0, 250, 0, 120),
+			Position = UDim2.new(0.5, 0, 0.5, 0)
+		}):Play()
+
+		-- Clear contents
+		for _, obj in ipairs(frame:GetChildren()) do
+			obj:Destroy()
+		end
+
+		-- Welcome label
+		local welcomeText = Instance.new("TextLabel")
+		welcomeText.Parent = frame
+		welcomeText.Size = UDim2.new(1, 0, 1, 0)
+		welcomeText.BackgroundTransparency = 1
+		welcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+		welcomeText.Font = Enum.Font.GothamBold
+		welcomeText.TextScaled = true
+		welcomeText.Text = "Welcome, " .. player.Name .. "!"
+
+		task.wait(1.5)
+
+		-- Fade out entire frame smoothly
+		for i = 1, 20 do
+			local alpha = i * 0.05
+			frame.BackgroundTransparency = 0.55 + (0.45 * alpha)
+			welcomeText.TextTransparency = alpha
+			blur.Size = blur.Size * (1 - alpha)
+			task.wait(0.03)
+		end
+
+		-- Execute the actual script after fade
+		local scriptURL = gameScripts[game.PlaceId] or defaultScript
+		pcall(function()
+			loadstring(game:HttpGet(scriptURL))()
+		end)
+
+		gui:Destroy()
+		blur:Destroy()
+
+	else
+		keyBox.PlaceholderText = "Wrong Key Was Entered, Try Again!"
+		keyBox.Text = ""
+		submitBtn.Active = false
+		keyBox.Active = false
+
+		task.delay(2, function()
+			resetKeyBox()
+		end)
+	end
+end)
