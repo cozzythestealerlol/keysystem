@@ -2,7 +2,7 @@
 -- CONFIGURATION
 ------------------------------------------------------------
 
-local correctKey = "MySecretKey123"
+local correctKey = "TI^H&*asN&(O*ahadns)(N"
 
 local gameScripts = {
 	[108631717812345] = "https://raw.githubusercontent.com/cozzythestealerlol/mainscript/refs/heads/main/hujsfjkhsfsailh",
@@ -11,7 +11,7 @@ local gameScripts = {
 
 local defaultScript = "https://example.com/default-script.lua"
 
-local clipboardLink = "dont worry about this at the moment" -- link copied by the new button
+local clipboardLink = "https://link-target.net/1439901/dYW6w6VnHDBq" -- link copied by the new button
 
 -- Cache duration in seconds (24 hours)
 local CACHE_SECONDS = 24 * 60 * 60
