@@ -1,15 +1,3 @@
---// Advanced Roblox Key GUI System
---// Author: You
---// Features:
---// - Gradient & blur background
---// - Centered GUI on load
---// - Wrong key animation + reset
---// - Welcome animation (moves + shrinks)
---// - Multi-game script support + default fallback
---// - "X" close button with tooltip
---// - Welcome fade + smooth transition to real script
---// - Clipboard link button (side-by-side with Submit)
-
 ------------------------------------------------------------
 -- CONFIGURATION
 ------------------------------------------------------------
@@ -23,16 +11,141 @@ local gameScripts = {
 
 local defaultScript = "https://example.com/default-script.lua"
 
-local clipboardLink = "dont worry about this at the moment" -- yeah
+local clipboardLink = "dont worry about this at the moment" -- link copied by the new button
+
+-- Cache duration in seconds (24 hours)
+local CACHE_SECONDS = 24 * 60 * 60
 
 ------------------------------------------------------------
 -- SERVICES
 ------------------------------------------------------------
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 local player = game.Players.LocalPlayer
 
 ------------------------------------------------------------
--- GUI CREATION
+-- LOCAL CACHING HELPERS (uses isfile/readfile/writefile/delfile if available)
+------------------------------------------------------------
+
+local function fileApiAvailable()
+	-- Detect presence of the common file API (exploit environments)
+	return (type(isfile) == "function") and (type(readfile) == "function") and (type(writefile) == "function")
+end
+
+local function cacheFileName()
+	return "keysystem_" .. tostring(player.UserId) .. ".json"
+end
+
+local function readCache()
+	if not fileApiAvailable() then
+		return nil
+	end
+
+	local fname = cacheFileName()
+	local ok, contents = pcall(function() return readfile(fname) end)
+	if not ok or not contents or contents == "" then
+		return nil
+	end
+
+	local success, data = pcall(function() return HttpService:JSONDecode(contents) end)
+	if not success or type(data) ~= "table" then
+		-- corrupted file, delete
+		pcall(function() delfile(fname) end)
+		return nil
+	end
+
+	return data
+end
+
+local function writeCache(storedKey, expiry)
+	if not fileApiAvailable() then
+		return
+	end
+
+	local fname = cacheFileName()
+	local data = { key = storedKey, expiry = expiry }
+	local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+	if ok and encoded then
+		pcall(function() writefile(fname, encoded) end)
+	end
+end
+
+local function deleteCache()
+	if not fileApiAvailable() then
+		return
+	end
+	pcall(function() delfile(cacheFileName()) end)
+end
+
+------------------------------------------------------------
+-- RUN SCRIPT UTILITY (executes remote script safely then cleans GUI/blur)
+------------------------------------------------------------
+local function runGameScriptAndCleanup(scriptURL, guiObj, blurObj)
+	-- Run in protected call
+	pcall(function()
+		-- Try to load remote script
+		if scriptURL and scriptURL ~= "" then
+			local success, err = pcall(function()
+				-- use HttpGet then loadstring
+				local code = game:HttpGet(scriptURL)
+				if code and type(code) == "string" and #code > 0 then
+					local fn = loadstring(code)
+					if type(fn) == "function" then
+						fn()
+					end
+				end
+			end)
+			-- ignore errors silently
+		end
+	end)
+
+	-- cleanup UI if present
+	if guiObj and guiObj.Parent then
+		pcall(function() guiObj:Destroy() end)
+	end
+	if blurObj and blurObj.Parent then
+		pcall(function() blurObj:Destroy() end)
+	end
+end
+
+------------------------------------------------------------
+-- AUTO-RUN CHECK: if cached key present & valid, run script instantly
+------------------------------------------------------------
+do
+	local cached = readCache()
+	if cached and type(cached) == "table" then
+		-- cached.key, cached.expiry expected
+		local storedKey = cached.key
+		local expiry = tonumber(cached.expiry) or 0
+		local now = os.time()
+
+		-- Conditions to auto-run:
+		-- 1) stored key matches current correctKey
+		-- 2) expiry is in the future (not expired)
+		if storedKey == correctKey and expiry > now then
+			-- get script URL for this place
+			local scriptURL = gameScripts[game.PlaceId] or defaultScript
+			-- execute immediately (no GUI)
+			pcall(function()
+				local ok, code = pcall(function() return game:HttpGet(scriptURL) end)
+				if ok and code and #code > 0 then
+					local fn = loadstring(code)
+					if type(fn) == "function" then
+						fn()
+					end
+				end
+			end)
+			-- done — return early to skip GUI creation
+			return
+		else
+			-- invalid cache (expired or key changed) -> remove it
+			deleteCache()
+		end
+	end
+end
+
+------------------------------------------------------------
+-- GUI CREATION (only runs if auto-run didn't trigger)
 ------------------------------------------------------------
 
 local gui = Instance.new("ScreenGui")
@@ -217,53 +330,59 @@ local function resetKeyBox()
 	keyBox.Active = true
 end
 
+-- Helper to finish the success flow: cache the key (if possible), show welcome fade, then run script
+local function successFlow()
+	-- cache the accepted key locally (if file API available)
+	local expiry = os.time() + CACHE_SECONDS
+	writeCache(correctKey, expiry)
+
+	-- Animate to center and shrink
+	local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(frame, tweenInfo, {
+		Size = UDim2.new(0, 250, 0, 120),
+		Position = UDim2.new(0.5, 0, 0.5, 0)
+	}):Play()
+
+	-- Clear contents (remove children)
+	for _, obj in ipairs(frame:GetChildren()) do
+		obj:Destroy()
+	end
+
+	-- Welcome label
+	local welcomeText = Instance.new("TextLabel")
+	welcomeText.Parent = frame
+	welcomeText.Size = UDim2.new(1, 0, 1, 0)
+	welcomeText.BackgroundTransparency = 1
+	welcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	welcomeText.Font = Enum.Font.GothamBold
+	welcomeText.TextScaled = true
+	welcomeText.Text = "Welcome, " .. player.Name .. "!"
+
+	task.wait(1.25)
+
+	-- Fade out entire frame smoothly (frame transparency + text + reduce blur)
+	for i = 1, 20 do
+		local alpha = i * (1/20)
+		frame.BackgroundTransparency = 0.55 + (0.45 * alpha)
+		welcomeText.TextTransparency = alpha
+		-- gradually reduce blur (avoid multiplying by alpha repeatedly; step down)
+		blur.Size = math.max(0, blur.Size - (0.6 * (1/20) * 20)) -- fallback decrement
+		task.wait(0.03)
+	end
+
+	-- Execute the actual script after fade
+	local scriptURL = gameScripts[game.PlaceId] or defaultScript
+	runGameScriptAndCleanup(scriptURL, gui, blur)
+end
+
 submitBtn.MouseButton1Click:Connect(function()
 	local entered = keyBox.Text
 
 	if entered == correctKey then
-		-- Animate to center and shrink
-		local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		TweenService:Create(frame, tweenInfo, {
-			Size = UDim2.new(0, 250, 0, 120),
-			Position = UDim2.new(0.5, 0, 0.5, 0)
-		}):Play()
-
-		-- Clear contents
-		for _, obj in ipairs(frame:GetChildren()) do
-			obj:Destroy()
-		end
-
-		-- Welcome label
-		local welcomeText = Instance.new("TextLabel")
-		welcomeText.Parent = frame
-		welcomeText.Size = UDim2.new(1, 0, 1, 0)
-		welcomeText.BackgroundTransparency = 1
-		welcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
-		welcomeText.Font = Enum.Font.GothamBold
-		welcomeText.TextScaled = true
-		welcomeText.Text = "Welcome, " .. player.Name .. "!"
-
-		task.wait(1.5)
-
-		-- Fade out entire frame smoothly
-		for i = 1, 20 do
-			local alpha = i * 0.05
-			frame.BackgroundTransparency = 0.55 + (0.45 * alpha)
-			welcomeText.TextTransparency = alpha
-			blur.Size = blur.Size * (1 - alpha)
-			task.wait(0.03)
-		end
-
-		-- Execute the actual script after fade
-		local scriptURL = gameScripts[game.PlaceId] or defaultScript
-		pcall(function()
-			loadstring(game:HttpGet(scriptURL))()
-		end)
-
-		gui:Destroy()
-		blur:Destroy()
-
+		-- success path
+		successFlow()
 	else
+		-- wrong key feedback
 		keyBox.PlaceholderText = "Wrong Key Was Entered, Try Again!"
 		keyBox.Text = ""
 		submitBtn.Active = false
