@@ -1,7 +1,8 @@
-local k_part_a = "r9&"
-local k_part_b = "Xq7*"
-local k_part_c = "Pw2"
-local k_part_d = "Z#"
+local k_part_a = "G7p#"
+local k_part_b = "X2v&"
+local k_part_c = "Q9L"
+local k_part_d = "mZ1"
+
 local correctKey = k_part_a .. k_part_b .. k_part_c .. k_part_d
 
 local gameScripts = {
