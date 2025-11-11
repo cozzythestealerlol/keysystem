@@ -1,36 +1,24 @@
-------------------------------------------------------------
--- CONFIGURATION
-------------------------------------------------------------
-
--- split key (harder to spot at a glance)
-local k_part_a = "7&IN"
-local k_part_b = "N%tn"
-local k_part_c = "fv8fa"
-local k_part_d = "ds&"
-local correctKey = k_part_a .. k_part_b .. k_part_c .. k_part_d -- change parts when needed
+local k_part_a = "r9&"
+local k_part_b = "Xq7*"
+local k_part_c = "Pw2"
+local k_part_d = "Z#"
+local correctKey = k_part_a .. k_part_b .. k_part_c .. k_part_d
 
 local gameScripts = {
 	[108631717812345] = "https://raw.githubusercontent.com/cozzythestealerlol/mainscript/refs/heads/main/hujsfjkhsfsailh",
-	[118915549367482] = "https://raw.githubusercontent.com/cozzythestealerlol/dwtbguiandstuff/refs/heads/main/dwtbadminsass"
+	[118915549367482] = "https://raw.githubusercontent.com/cozzythestealerlol/dwtbguiandstuff/refs/heads/main/dwtbadminsass",
+	[137308168315486] = "https://raw.githubusercontent.com/cozzythestealerlol/twb78kah/refs/heads/main/ohahopadsf"
 }
 
 local defaultScript = "https://example.com/default-script.lua"
 
 local clipboardLink = "https://link-target.net/1439901/dYW6w6VnHDBq"
 
--- Cache duration in seconds (48 hours)
 local CACHE_SECONDS = 48 * 60 * 60
 
-------------------------------------------------------------
--- SERVICES
-------------------------------------------------------------
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local player = game.Players.LocalPlayer
-
-------------------------------------------------------------
--- LOCAL CACHING HELPERS
-------------------------------------------------------------
 
 local function fileApiAvailable()
 	return (type(isfile) == "function") and (type(readfile) == "function") and (type(writefile) == "function")
@@ -66,9 +54,6 @@ local function deleteCache()
 	pcall(function() delfile(cacheFileName()) end)
 end
 
-------------------------------------------------------------
--- RUN SCRIPT UTILITY
-------------------------------------------------------------
 local function runGameScriptAndCleanup(scriptURL, guiObj, blurObj)
 	pcall(function()
 		if scriptURL and scriptURL ~= "" then
@@ -85,9 +70,6 @@ local function runGameScriptAndCleanup(scriptURL, guiObj, blurObj)
 	if blurObj and blurObj.Parent then pcall(function() blurObj:Destroy() end) end
 end
 
-------------------------------------------------------------
--- AUTO-RUN CHECK: if cached key present & valid, run script instantly
-------------------------------------------------------------
 do
 	local cached = readCache()
 	if cached and type(cached) == "table" then
@@ -96,7 +78,6 @@ do
 		local now = os.time()
 
 		if storedKey == correctKey and expiry > now then
-			-- ✅ valid cache → auto-run
 			local scriptURL = gameScripts[game.PlaceId] or defaultScript
 			pcall(function()
 				local ok, code = pcall(function() return game:HttpGet(scriptURL) end)
@@ -107,7 +88,6 @@ do
 			end)
 			return
 		else
-			-- ❌ invalid, expired, or key changed → delete and notify
 			deleteCache()
 
 			local playerGui = player:WaitForChild("PlayerGui")
@@ -151,7 +131,7 @@ do
 			sound.Volume = 1
 			sound:Play()
 			task.delay(sound.TimeLength, function()
-				sound:Play() -- play twice
+				sound:Play()
 			end)
 
 			local fadeIn = TweenService:Create(notifFrame, TweenInfo.new(0.4), {BackgroundTransparency = 0.15})
@@ -165,9 +145,6 @@ do
 	end
 end
 
-------------------------------------------------------------
--- GUI CREATION
-------------------------------------------------------------
 local gui = Instance.new("ScreenGui")
 gui.Name = "KeySystemGui"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -179,7 +156,6 @@ local blur = Instance.new("BlurEffect")
 blur.Size = 0
 blur.Parent = game.Lighting
 
--- Background gradient
 local bgFrame = Instance.new("Frame")
 bgFrame.Parent = gui
 bgFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -192,7 +168,6 @@ bgGradient.Color = ColorSequence.new{
 }
 bgGradient.Rotation = 45
 
--- Main frame
 local frame = Instance.new("Frame")
 frame.Parent = gui
 frame.Size = UDim2.new(0, 420, 0, 220)
@@ -213,7 +188,6 @@ gradient.Color = ColorSequence.new{
 }
 gradient.Rotation = 45
 
--- Close button
 local closeBtn = Instance.new("TextButton", frame)
 closeBtn.Text = "X"
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -245,7 +219,6 @@ closeBtn.MouseButton1Click:Connect(function()
 	blur:Destroy()
 end)
 
--- Key label + box
 local keyLabel = Instance.new("TextLabel", frame)
 keyLabel.Text = "Key:"
 keyLabel.Position = UDim2.new(0.1, 0, 0.35, 0)
@@ -267,7 +240,6 @@ keyBox.Font = Enum.Font.Gotham
 keyBox.TextSize = 16
 Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 10)
 
--- Submit button
 local submitBtn = Instance.new("TextButton", frame)
 submitBtn.Text = "Submit"
 submitBtn.Size = UDim2.new(0, 140, 0, 35)
@@ -279,7 +251,6 @@ submitBtn.Font = Enum.Font.GothamBold
 submitBtn.TextSize = 18
 Instance.new("UICorner", submitBtn).CornerRadius = UDim.new(0, 10)
 
--- Clipboard button
 local copyBtn = Instance.new("TextButton", frame)
 copyBtn.Text = "Key System Here"
 copyBtn.Size = UDim2.new(0, 140, 0, 35)
@@ -300,7 +271,6 @@ copyBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Fade-in
 frame.BackgroundTransparency = 1
 blur.Size = 0
 task.spawn(function()
@@ -311,9 +281,6 @@ task.spawn(function()
 	end
 end)
 
-------------------------------------------------------------
--- KEY VALIDATION
-------------------------------------------------------------
 local function resetKeyBox()
 	keyBox.PlaceholderText = "Enter your key"
 	keyBox.Text = ""
