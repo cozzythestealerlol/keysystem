@@ -14,6 +14,7 @@ local gameScripts = {
 local defaultScript = "nope"
 
 local clipboardLink = "https://work.ink/28lh/key-system-brainrot"
+-- KEEP HERE TILL READY: https://raw.githubusercontent.com/cozzytheidiot-star/6wrhtds6e4itwvatr/refs/heads/main/e4vtsde45ybe5
 
 local CACHE_SECONDS = 48 * 60 * 60
 
