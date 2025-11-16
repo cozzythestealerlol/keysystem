@@ -1,7 +1,7 @@
-local k_part_a = "Qf9A"
-local k_part_b = "*ZrT"
-local k_part_c = "1kB3"
-local k_part_d = "M"
+local k_part_a = "W8pL"
+local k_part_b = "a3#Q"
+local k_part_c = "Vz9*"
+local k_part_d = "R2"
 
 local correctKey = k_part_a .. k_part_b .. k_part_c .. k_part_d
 
@@ -11,9 +11,9 @@ local gameScripts = {
 	[137308168315486] = "https://raw.githubusercontent.com/cozzythestealerlol/twb78kah/refs/heads/main/ohahopadsf"
 }
 
-local defaultScript = "https://example.com/default-script.lua"
+local defaultScript = "nope"
 
-local clipboardLink = "https://link-target.net/1439901/dYW6w6VnHDBq"
+local clipboardLink = "https://work.ink/28lh/key-system-brainrot"
 
 local CACHE_SECONDS = 48 * 60 * 60
 
