@@ -1,7 +1,7 @@
-local k_part_a = "W8pL"
-local k_part_b = "a3#Q"
-local k_part_c = "Vz9*"
-local k_part_d = "R2"
+local k_part_a = "M4x#"
+local k_part_b = "Qp8L"
+local k_part_c = "z!T2"
+local k_part_d = "vR9@Kd$"
 
 local correctKey = k_part_a .. k_part_b .. k_part_c .. k_part_d
 
