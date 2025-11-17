@@ -8,7 +8,8 @@ local correctKey = k_part_a .. k_part_b .. k_part_c .. k_part_d
 local gameScripts = {
 	[108631717812345] = "https://raw.githubusercontent.com/cozzythestealerlol/mainscript/refs/heads/main/hujsfjkhsfsailh",
 	[118915549367482] = "https://raw.githubusercontent.com/cozzythestealerlol/dwtbguiandstuff/refs/heads/main/dwtbadminsass",
-	[137308168315486] = "https://raw.githubusercontent.com/cozzythestealerlol/twb78kah/refs/heads/main/ohahopadsf"
+	[137308168315486] = "https://raw.githubusercontent.com/cozzythestealerlol/twb78kah/refs/heads/main/ohahopadsf",
+	[18450282790] = "https://raw.githubusercontent.com/cozzythestealerlol/avtwvta/refs/heads/main/drby6rt"
 }
 
 local defaultScript = "nope"
